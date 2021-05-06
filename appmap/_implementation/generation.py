@@ -52,9 +52,9 @@ class FuncEntry(ClassMapEntry):
         self.labels = e.labels
 
 
-def classmap(recording):
+def classmap(events):
     ret = ClassMapDict()
-    for e in recording.events:
+    for e in events:
         try:
             if e.event != 'call':
                 continue
@@ -88,7 +88,8 @@ def classmap(recording):
     return ret
 
 
-def appmap(recording, metadata):
+def appmap(events, metadata):
+    """Generate an appmap represented as a dict, appropriate for dumping to JSON."""
     appmap_metadata = Metadata().to_dict()
     if metadata:
         appmap_metadata.update(metadata)
@@ -96,8 +97,8 @@ def appmap(recording, metadata):
     return {
         'version': '1.4',
         'metadata': appmap_metadata,
-        'events': recording.events,
-        'classMap': list(classmap(recording).values())
+        'events': events,
+        'classMap': list(classmap(events).values())
     }
 
 
@@ -114,5 +115,8 @@ class AppMapEncoder(json.JSONEncoder):
 
 
 def dump(recording, metadata=None, indent=None):
+    """Generate a JSON representation of an appmap."""
+    if hasattr(recording, 'events'):
+        recording = recording.events
     a = appmap(recording, metadata)
     return json.dumps(a, cls=AppMapEncoder, indent=indent)
