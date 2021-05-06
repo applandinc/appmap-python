@@ -65,6 +65,10 @@ def normalize_appmap(generated_appmap):
             assert isinstance(elapsed, float)
         if 'git' in dct:
             normalize_git(dct.pop('git'))
+        if 'headers' in dct:
+            dct['headers'].pop('User-Agent', None)
+        if 'http_server_request' in dct:
+            normalize(dct['http_server_request'])
         if 'location' in dct:
             dct['location'] = normalize_path(dct['location'])
         if 'path' in dct:

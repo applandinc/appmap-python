@@ -4,7 +4,7 @@
         {
             "event": "call",
             "http_server_request": {
-                "headers": { "Host": "localhost", "User-Agent": "werkzeug" },
+                "headers": { "Host": "localhost" },
                 "normalized_path_info": "/",
                 "path_info": "/",
                 "protocol": "HTTP/1.1",
@@ -28,7 +28,7 @@
         {
             "event": "call",
             "http_server_request": {
-                "headers": { "Host": "localhost", "User-Agent": "werkzeug" },
+                "headers": { "Host": "localhost" },
                 "normalized_path_info": "/user/<username>",
                 "path_info": "/user/test_user",
                 "protocol": "HTTP/1.1",
@@ -52,7 +52,7 @@
         {
             "event": "call",
             "http_server_request": {
-                "headers": { "Host": "localhost", "User-Agent": "werkzeug" },
+                "headers": { "Host": "localhost" },
                 "normalized_path_info": "/post/<int:post_id>",
                 "path_info": "/post/123",
                 "protocol": "HTTP/1.1",
