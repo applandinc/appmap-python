@@ -14,6 +14,7 @@ install: |
   fi
   export PATH="$PYENV_ROOT/bin:$PATH"
   pyenv update
+  pyenv --version
   git clone https://github.com/momo-lab/xxenv-latest.git "$(pyenv root)/plugins/xxenv-latest"
   for v in {6..9}; do pyenv latest install -s 3.$v; pyenv latest uninstall -f 3.$v; done
   pyenv latest local 3.{9,{6..8}}
@@ -27,13 +28,19 @@ cache:
 
 script:
 - export PATH="$HOME/.pyenv/bin:$PATH"
+- pyenv init
 - eval "$(pyenv init -)"
+- eval "$(pyenv init --path)"
 - eval "$(pyenv virtualenv-init -)"
+- pyenv whence python3.6
+- pyenv which python3.6
+- pyenv local
+- pyenv prefix
 - tox -e py39 -- pylint appmap || travis_terminate 1
 - tox -e py39 -- vermin -t=3.6- appmap || travis_terminate 1
-- tox
-- poetry build
-- ci/test_install.sh
+- tox || travis_terminate 1
+# - poetry build
+# - ci/test_install.sh
 
 before_deploy:
 - awk -i inplace -v travis_tag=$TRAVIS_TAG '/# @@appmap-python-version@@/ {getline; printf("version = \"%s\"\n", travis_tag)}; !/version = "0.0.0"/ {print $0}' pyproject.toml
