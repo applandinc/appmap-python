@@ -30,6 +30,7 @@ script:
 - export PATH="$HOME/.pyenv/bin:$PATH"
 - pyenv init
 - eval "$(pyenv init -)"
+- eval "$(pyenv init --path)"
 - eval "$(pyenv virtualenv-init -)"
 - pyenv whence python3.6
 - pyenv which python3.6
