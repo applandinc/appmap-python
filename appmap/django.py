@@ -3,10 +3,13 @@ from django.conf import settings
 from django.db.backends.utils import CursorDebugWrapper
 from django.db.backends.signals import connection_created
 from django.dispatch import receiver
+from django.http import HttpResponse, HttpResponseBadRequest, JsonResponse
 
 import time
 import json
 
+from appmap._implementation import generation
+from appmap._implementation.env import Env
 from appmap._implementation.event import SqlEvent, ReturnEvent, HttpRequestEvent, HttpResponseEvent
 from appmap._implementation.instrument import is_instrumentation_disabled
 from appmap._implementation.recording import Recorder
@@ -113,6 +116,8 @@ class Middleware:
         self.recorder = Recorder()
 
     def __call__(self, request):
+        if Env.current.enabled and request.path_info == '/_appmap/record':
+            return self.recording(request)
         if self.recorder.enabled:
             start = time.monotonic()
             call_event = HttpRequestEvent(
@@ -137,6 +142,29 @@ class Middleware:
             self.recorder.add_event(return_event)
 
         return response
+
+    def recording(self, request):
+        """Handle recording requests."""
+        if request.method == 'GET':
+            return JsonResponse({'enabled': self.recorder.enabled})
+        if request.method == 'POST':
+            if self.recorder.enabled:
+                return HttpResponse('Recording is already in progress', status=409)
+            self.recorder.clear()
+            self.recorder.start_recording()
+            return HttpResponse()
+
+        if request.method == 'DELETE':
+            if not self.recorder.enabled:
+                return HttpResponse('No recording is in progress', status=404)
+
+            return HttpResponse(
+                generation.dump(self.recorder.stop_recording()),
+                content_type='application/json'
+            )
+
+
+        return HttpResponseBadRequest()
 
 
 def inject_middleware():

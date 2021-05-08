@@ -1,15 +1,13 @@
-import os.path
-
+import importlib
 import pytest
+import yaml
 
 import appmap._implementation
 from appmap._implementation.env import Env
 from appmap._implementation.recording import Recorder
 
 def _data_dir(pytestconfig):
-    return str(os.path.join(
-        str(pytestconfig.rootpath),
-        'appmap', 'test', 'data'))
+    return pytestconfig.rootpath / 'appmap' / 'test' / 'data'
 
 @pytest.fixture(name='data_dir')
 def fixture_data_dir(pytestconfig):
@@ -36,8 +34,12 @@ def pytest_runtest_setup(item):
     if mark:
         appmap_yml = mark.kwargs.get('config', 'appmap.yml')
         d = _data_dir(item.config)
-        config = os.path.join(d, appmap_yml)
+        config = d / appmap_yml
         Env.current.set('APPMAP_CONFIG', config)
         env = {'APPMAP': 'true', 'APPMAP_CONFIG': config}
 
     appmap._implementation.initialize(env=env)  # pylint: disable=protected-access
+
+    # Some tests want yaml instrumented, others don't.
+    # Reload it to make sure it's instrumented, or not, as set in appmap.yml.
+    importlib.reload(yaml)

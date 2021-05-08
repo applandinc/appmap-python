@@ -1,25 +1,18 @@
 # flake8: noqa: E402
-# pylint: disable=unused-import
-
-import pytest
-
-pytest.importorskip('django')
+# pylint: disable=unused-import, redefined-outer-name, missing-function-docstring
 
 import django.conf
 import django.db
+import django.http
 import django.test
+import django.urls
+import pytest
+
+
 import appmap.django  # noqa: F401
 
+from .web_framework import TestRequestCapture, TestRecording
 
-# Note that with django configured this way, django.test.Client
-# requests for '/test' will print warning messages that look like
-# `WARNING:django.request:Not Found: /test`. These don't appear to
-# indicate a problem.
-django.conf.settings.configure(
-    DATABASES={'default': {'ENGINE': 'django.db.backends.sqlite3', 'NAME': ':memory:'}},
-    MIDDLEWARE=['django.middleware.http.ConditionalGetMiddleware'],
-    ROOT_URLCONF=()
-)
 
 def test_sql_capture(events):
     conn = django.db.connections['default']
@@ -31,27 +24,7 @@ def test_sql_capture(events):
     assert events[0].sql_query['server_version'].startswith('3.')
 
 
-def test_http_capture(events):
-    client = django.test.Client()
-    client.get('/test')
-
-    assert events[0].http_server_request.items() >= {
-        'request_method': 'GET',
-        'path_info': '/test',
-        'protocol': 'HTTP/1.1'
-    }.items()
-
-    response = events[1].http_server_response
-    assert response.items() >= {
-        'status_code': 404,
-        'mime_type': 'text/html'
-    }.items()
-
-    assert 'ETag' in response['headers']
-
-
-def test_message_capture_post(events):
-    client = django.test.Client()
+def test_message_capture_post(events, client):
     client.post('/test', { 'my_param': 'example' },
         content_type='application/json; charset=UTF-8',
         HTTP_AUTHORIZATION='token "test-token"',
@@ -80,8 +53,7 @@ def test_message_capture_post(events):
         'Accept-Language': 'pl'
     }.items()
 
-def test_message_capture_get(events):
-    client = django.test.Client()
+def test_message_capture_get(events, client):
     client.get('/test', { 'my_param': 'example' })
 
     assert events[0].message == [
@@ -93,8 +65,7 @@ def test_message_capture_get(events):
         }
     ]
 
-def test_message_capture_get_arr(events):
-    client = django.test.Client()
+def test_message_capture_get_arr(events, client):
     client.get('/test', { 'my_param': ['example', 'example2'] })
 
     assert events[0].message == [
@@ -107,8 +78,7 @@ def test_message_capture_get_arr(events):
     ]
 
 
-def test_message_capture_post_form_urlencoded(events):
-    client = django.test.Client()
+def test_message_capture_post_form_urlencoded(events, client):
     client.post('/test', 'my_param=example', content_type='application/x-www-form-urlencoded')
 
     assert events[0].message == [
@@ -120,8 +90,7 @@ def test_message_capture_post_form_urlencoded(events):
         }
     ]
 
-def test_message_capture_put(events):
-    client = django.test.Client()
+def test_message_capture_put(events, client):
     client.put('/test', { 'my_param': 'example' }, content_type='application/json')
 
     assert events[0].message == [
@@ -133,8 +102,7 @@ def test_message_capture_put(events):
         }
     ]
 
-def test_message_capture_post_bad_json(events):
-    client = django.test.Client()
+def test_message_capture_post_bad_json(events, client):
     client.post('/test?my_param=example', "bad json", content_type='application/json')
 
     assert events[0].message == [
@@ -147,8 +115,7 @@ def test_message_capture_post_bad_json(events):
     ]
 
 
-def test_message_capture_post_multipart(events):
-    client = django.test.Client()
+def test_message_capture_post_multipart(events, client):
     client.post('/test', { 'my_param': 'example' })
 
     assert events[0].message == [
@@ -161,8 +128,7 @@ def test_message_capture_post_multipart(events):
     ]
 
 
-def test_message_capture_post_with_query(events):
-    client = django.test.Client()
+def test_message_capture_post_with_query(events, client):
     client.post('/test?my_param=get', { 'my_param': 'example' })
 
     assert events[0].message == [
@@ -173,3 +139,46 @@ def test_message_capture_post_with_query(events):
             'value': "['get', 'example']"
         }
     ]
+
+
+# pylint: disable=arguments-differ
+class ClientAdaptor(django.test.Client):
+    """Adaptor for the client request parameters used in .web_framework tests."""
+    def generic(self, *args, headers=None, **kwargs):
+        headers = {
+            'HTTP_' + k.replace('-', '_').upper(): v
+            for k, v in (headers or {}).items()
+        }
+        return super().generic(*args, **headers, **kwargs)
+
+    def post(self, *args, json=None, **kwargs):
+        if json:
+            kwargs['data'] = json
+            kwargs['content_type'] = 'application/json'
+        return super().post(*args, **kwargs)
+
+
+@pytest.fixture
+def client():
+    return ClientAdaptor()
+
+
+def view(_request):
+    return django.http.HttpResponse('testing')
+
+def user_view(_request, name):
+    return django.http.HttpResponse(f'user {name}')
+
+urlpatterns = [
+    django.urls.path('test', view),
+    django.urls.path('', view),
+    django.urls.path('user/<name>', user_view),
+    django.urls.path('post/<name>', user_view),
+]
+
+
+django.conf.settings.configure(
+    DATABASES={'default': {'ENGINE': 'django.db.backends.sqlite3', 'NAME': ':memory:'}},
+    MIDDLEWARE=['django.middleware.http.ConditionalGetMiddleware'],
+    ROOT_URLCONF='appmap.test.test_django'
+)
